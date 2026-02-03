@@ -10,10 +10,10 @@ public class ChatClient {
         String nickname = scanner.nextLine().trim();
 
         UUID clientId = UUID.randomUUID();
-        String broadcastIp = "192.168.1.255"; // Inserisci l'indirizzo di broadcast
+        String multicastIp = "230.0.0.1"; // IP multicast scelto
 
-        Sender sender = new Sender(broadcastIp, clientId, nickname);
-        Receiver receiver = new Receiver(clientId);
+        Sender sender = new Sender(multicastIp, clientId, nickname);
+        Receiver receiver = new Receiver(clientId, multicastIp);
 
         new Thread(receiver).start();
 

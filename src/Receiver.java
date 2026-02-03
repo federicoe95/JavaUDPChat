@@ -1,27 +1,63 @@
 import com.google.gson.Gson;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
+
+import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
 import java.util.UUID;
 
 public class Receiver implements Runnable {
 
     private static final int PORT = 50000;
     private final UUID myClientId;
-    private final DatagramSocket socket;
+    private final MulticastSocket socket;
+    private final InetAddress groupAddress;
     private final Gson gson = new Gson();
 
-    public Receiver(UUID myClientId) throws Exception {
+    public Receiver(UUID myClientId, String multicastIp) throws Exception {
         this.myClientId = myClientId;
-        this.socket = new DatagramSocket(PORT);
-        this.socket.setBroadcast(true);
+        this.groupAddress = InetAddress.getByName(multicastIp);
+
+        this.socket = new MulticastSocket(PORT);
+
+        // Trova la prima interfaccia di rete attiva e non loopback
+        NetworkInterface networkInterface = findIPv4NetworkInterface();
+        if (networkInterface == null) {
+            throw new RuntimeException("Nessuna interfaccia di rete attiva trovata!");
+        }
+
+        // Join del gruppo usando il nuovo metodo
+        SocketAddress group = new InetSocketAddress(groupAddress, PORT);
+        socket.joinGroup(group, networkInterface);
+
+        System.out.println("In ascolto sul gruppo multicast " + multicastIp + " tramite interfaccia " + networkInterface.getName());
+    }
+
+    private NetworkInterface findIPv4NetworkInterface() throws Exception {
+        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+
+        while (interfaces.hasMoreElements()) {
+            NetworkInterface ni = interfaces.nextElement();
+
+            if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
+
+            // Controlla se ha almeno un indirizzo IPv4 associato
+            Enumeration<InetAddress> addresses = ni.getInetAddresses();
+            while (addresses.hasMoreElements()) {
+                InetAddress addr = addresses.nextElement();
+                if (addr instanceof Inet4Address) {
+                    System.out.println("Interfaccia di rete selezionata: " + ni.getName() + " -> " + addr.getHostAddress());
+                    return ni;
+                }
+            }
+        }
+
+        // fallback: loopback (utile per test sulla stessa macchina)
+        return NetworkInterface.getByInetAddress(InetAddress.getByName("127.0.0.1"));
     }
 
     @Override
     public void run() {
-        byte[] buffer = new byte[4096]; // dimensioni buffer aumentato per sicurezza
-
-        System.out.println("In ascolto sulla porta " + PORT);
+        byte[] buffer = new byte[2048];
 
         while (true) {
             try {
@@ -31,7 +67,6 @@ public class Receiver implements Runnable {
                 String json = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
                 Message msg = gson.fromJson(json, Message.class);
 
-                // scarta i messaggi propri
                 if (msg.getClientId().equals(myClientId)) continue;
 
                 String senderIp = packet.getAddress().getHostAddress();
