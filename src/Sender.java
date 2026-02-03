@@ -1,28 +1,42 @@
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.util.Scanner;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
-public class Sender {
-    public static void main(String[] args) throws Exception {
-        Scanner sc = new Scanner(System.in);
-        System.out.print("Inserisci il tuo nickname: ");
-        String nickname = sc.nextLine();
+public class Sender implements Runnable {
 
-        int porta = 12345; // stessa porta del receiver
-        DatagramSocket socket = new DatagramSocket();
-        socket.setBroadcast(true);
-        //InetAddress broadcast = InetAddress.getByName("255.255.255.255");
-        InetAddress broadcast = InetAddress.getByName("192.168.1.255");
+    private static final int PORT = 50000;
 
-        System.out.println("Scrivi i messaggi e premi invio per inviarli...");
+    private final UUID clientId;
+    private final String nickname;
+    private final InetAddress broadcastAddress;
+    private final DatagramSocket socket;
 
-        while (true) {
-            String messaggio = sc.nextLine();
-            String fullMessage = "[" + nickname + "]: " + messaggio;
-            byte[] data = fullMessage.getBytes();
-            DatagramPacket packet = new DatagramPacket(data, data.length, broadcast, porta);
-            socket.send(packet);
-        }
+    public Sender(String broadcastIp, UUID clientId, String nickname) throws Exception {
+        this.clientId = clientId;
+        this.nickname = nickname;
+        this.broadcastAddress = InetAddress.getByName(broadcastIp);
+        this.socket = new DatagramSocket();
+        this.socket.setBroadcast(true);
+    }
+
+    public void send(String message) throws Exception {
+        String payload = clientId + "|" + nickname + "|" + message;
+
+        byte[] buffer = payload.getBytes(StandardCharsets.UTF_8);
+
+        DatagramPacket packet = new DatagramPacket(
+                buffer,
+                buffer.length,
+                broadcastAddress,
+                PORT
+        );
+        socket.send(packet);
+    }
+
+    @Override
+    public void run() {
+        // opzionale se vuoi input continuo
     }
 }
