@@ -11,9 +11,10 @@ public class ChatClient {
 
         UUID clientId = UUID.randomUUID();
         String multicastIp = "230.0.0.1"; // IP multicast scelto
+        String lanIpPrefix = "192.168.1";
 
         Sender sender = new Sender(multicastIp, clientId, nickname);
-        Receiver receiver = new Receiver(clientId, multicastIp);
+        Receiver receiver = new Receiver(clientId, multicastIp, lanIpPrefix);
 
         new Thread(receiver).start();
 

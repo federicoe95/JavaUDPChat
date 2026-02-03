@@ -13,14 +13,14 @@ public class Receiver implements Runnable {
     private final InetAddress groupAddress;
     private final Gson gson = new Gson();
 
-    public Receiver(UUID myClientId, String multicastIp) throws Exception {
+    public Receiver(UUID myClientId, String multicastIp, String lanIpPrefix) throws Exception {
         this.myClientId = myClientId;
         this.groupAddress = InetAddress.getByName(multicastIp);
 
         this.socket = new MulticastSocket(PORT);
 
-        // Trova la prima interfaccia di rete attiva e non loopback
-        NetworkInterface networkInterface = findIPv4NetworkInterface();
+        // Trova la prima interfaccia di rete attiva dato un prefisso e non loopback
+        NetworkInterface networkInterface = findIPv4NetworkInterfaceByPrefix(lanIpPrefix);
         if (networkInterface == null) {
             throw new RuntimeException("Nessuna interfaccia di rete attiva trovata!");
         }
@@ -32,7 +32,7 @@ public class Receiver implements Runnable {
         System.out.println("In ascolto sul gruppo multicast " + multicastIp + " tramite interfaccia " + networkInterface.getName());
     }
 
-    private NetworkInterface findIPv4NetworkInterface() throws Exception {
+    private NetworkInterface findIPv4NetworkInterfaceByPrefix(String prefix) throws Exception {
         Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
 
         while (interfaces.hasMoreElements()) {
@@ -40,17 +40,20 @@ public class Receiver implements Runnable {
 
             if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
 
-            // Controlla se ha almeno un indirizzo IPv4 associato
             Enumeration<InetAddress> addresses = ni.getInetAddresses();
             while (addresses.hasMoreElements()) {
                 InetAddress addr = addresses.nextElement();
                 if (addr instanceof Inet4Address) {
-                    System.out.println("Interfaccia di rete selezionata: " + ni.getName() + " -> " + addr.getHostAddress());
-                    return ni;
+                    String ip = addr.getHostAddress();
+                    if (ip.startsWith(prefix)) {
+                        System.out.println("Trovata NIC: " + ni.getName() + " -> " + ip);
+                        return ni;
+                    }
                 }
             }
         }
 
+        System.out.println("Nessuna NIC con prefisso: " + prefix + " trovata...");
         // fallback: loopback (utile per test sulla stessa macchina)
         return NetworkInterface.getByInetAddress(InetAddress.getByName("127.0.0.1"));
     }
